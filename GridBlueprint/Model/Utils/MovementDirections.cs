@@ -1,6 +1,6 @@
 using Mars.Interfaces.Environments;
 
-namespace GridBlueprint.Model;
+namespace GridBlueprint.Model.Utils;
 
 public abstract class MovementDirections
 {

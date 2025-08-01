@@ -1,6 +1,7 @@
 using System;
 using System.IO;
-using GridBlueprint.Model;
+using GridBlueprint.Model.Agents;
+using GridBlueprint.Model.Layers;
 using Mars.Components.Starter;
 using Mars.Interfaces.Model;
 

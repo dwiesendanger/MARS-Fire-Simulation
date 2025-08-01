@@ -1,8 +1,9 @@
 using System;
 using Mars.Interfaces.Agents;
 using Mars.Interfaces.Environments;
+using GridBlueprint.Model.Layers;
 
-namespace GridBlueprint.Model;
+namespace GridBlueprint.Model.Agents;
 
 public class HelperAgent : IAgent<GridLayer>, IPositionable
 {

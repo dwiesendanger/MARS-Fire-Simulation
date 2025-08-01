@@ -4,8 +4,10 @@ using Mars.Interfaces.Agents;
 using Mars.Interfaces.Annotations;
 using Mars.Interfaces.Environments;
 using Mars.Interfaces.Layers;
+using GridBlueprint.Model.Layers;
+using GridBlueprint.Model.Utils;
 
-namespace GridBlueprint.Model;
+namespace GridBlueprint.Model.Agents;
 
 public class SimpleAgent : IAgent<GridLayer>, IPositionable
 {

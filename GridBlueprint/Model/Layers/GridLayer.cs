@@ -5,8 +5,9 @@ using Mars.Components.Layers;
 using Mars.Core.Data;
 using Mars.Interfaces.Data;
 using Mars.Interfaces.Layers;
+using GridBlueprint.Model.Agents;
 
-namespace GridBlueprint.Model;
+namespace GridBlueprint.Model.Layers;
 
 public class GridLayer : RasterLayer
 {

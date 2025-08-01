@@ -1,4 +1,4 @@
-namespace GridBlueprint.Model;
+namespace GridBlueprint.Model.Utils;
 
 public enum AgentState
 {
