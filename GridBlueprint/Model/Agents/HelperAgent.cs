@@ -5,21 +5,71 @@ using GridBlueprint.Model.Layers;
 
 namespace GridBlueprint.Model.Agents;
 
-public class HelperAgent : IAgent<GridLayer>, IPositionable
+/// <summary>
+///     The HelperAgent serves as a coordinator for the fire simulation by calling the FireLayer's tick method.
+///     This agent is responsible for driving the simulation forward and detecting when the fire has completely burned out.
+///     It implements automatic simulation completion detection to optimize performance once no cells are burning.
+/// </summary>
+public class HelperAgent : IAgent<FireLayer>, IPositionable
 {
-    public void Init(GridLayer layer)
+    #region Fields and Properties
+
+    /// <summary>
+    ///     Unique identifier for this agent instance.
+    /// </summary>
+    public Guid ID { get; set; }
+    
+    /// <summary>
+    ///     Position of the agent in the simulation space (not used for fire simulation).
+    /// </summary>
+    public Position Position { get; set; }
+    
+    /// <summary>
+    ///     Reference to the FireLayer that this agent manages.
+    /// </summary>
+    private FireLayer _layer;
+    
+    /// <summary>
+    ///     Flag to ensure the completion message is only logged once.
+    /// </summary>
+    private bool _hasLogged = false;
+
+    #endregion
+
+    #region Initialization
+
+    /// <summary>
+    ///     Initializes the HelperAgent and establishes connection to the FireLayer.
+    ///     This method is called once at the beginning of the simulation.
+    /// </summary>
+    /// <param name="layer">The FireLayer instance that this agent will coordinate</param>
+    public void Init(FireLayer layer)
     {
         _layer = layer;
+        Console.WriteLine("HelperAgent initialized");
     }
 
+    #endregion
+
+    #region Simulation Logic
+
+    /// <summary>
+    ///     Executes one simulation step by calling the FireLayer's tick method.
+    ///     Also monitors for simulation completion and logs the completion message once.
+    ///     This method is called once per simulation tick by the MARS framework.
+    /// </summary>
     public void Tick()
     {
-        // The simulation sends layer data to the visualization web socket only when a change in layer data occurs.
-        // Therefore, we make an initial layer access to send layer data to web socket for visualization.
-        _layer[0, 0] = _layer[0, 0];
+        // Drive the fire simulation forward
+        _layer.Tick();
+        
+        // Check if fire simulation has completed and log completion message once
+        if (_layer.IsSimulationComplete && !_hasLogged)
+        {
+            Console.WriteLine("Fire simulation completed. Stopping simulation...");
+            _hasLogged = true;
+        }
     }
 
-    public Guid ID { get; set; }
-    public Position Position { get; set; }
-    private GridLayer _layer;
+    #endregion
 }

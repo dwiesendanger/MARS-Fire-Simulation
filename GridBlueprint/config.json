@@ -1,7 +1,7 @@
 {
   "globals": {
-    "startTime": "2022-03-01T05:00",
-    "endTime": "2022-03-01T05:10",
+    "startTime": "2025-08-02T10:00",
+    "endTime": "2025-08-02T10:10",
     "deltaTUnit": "seconds",
     "deltaT": 1,
     "output": "csv",
@@ -9,22 +9,13 @@
   },
   "layers": [
     {
-      "name": "GridLayer",
-      "file": "Resources/grid_closed.csv",
-      "pythonVisualization": true
+      "name": "FireLayer",
+      "pythonVisualization": true,
+      "density": 0.65,
+      "file": "Resources/grid_250x250.csv"
     }
   ],
   "agents": [
-    {
-      "name": "SimpleAgent",
-      "count": 1,
-      "file": "Resources/simple_agent.csv"
-    },
-    {
-      "name": "ComplexAgent",
-      "count": 1,
-      "file": "Resources/complex_agent.csv"
-    },
     {
       "name": "HelperAgent",
       "count": 1

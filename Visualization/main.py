@@ -25,11 +25,18 @@ YELLOW_LIGHT = [205, 217, 104, 10]
 PURPLE_LIGHT = [162, 134, 222, 10]
 BLUE_LIGHT = [174, 218, 233, 10]
 
+# NetLogo Fire colors:
+# 0: black (Empty), 1: green (Tree), 2: light-red (Burning), 3: dark-red (Burned)
+FIRE_GREEN = (0, 180, 0)
+FIRE_BURNING = (255, 100, 50)
+FIRE_BURNED = (80, 0, 0)
+FIRE_EMPTY = (0, 0, 0)
+
 RASTER_COLORS = {
-    1: GREEN_LIGHT,
-    2: YELLOW_LIGHT,
-    3: PURPLE_LIGHT,
-    4: BLUE_LIGHT,
+    0: FIRE_EMPTY,    # Empty
+    1: FIRE_GREEN,    # Tree
+    2: FIRE_BURNING,  # Burning
+    3: FIRE_BURNED,   # Burned
 }
 UNKNOWN_RASTER = WHITE
 AGENT_COLORS = [GREEN_LIGHT, YELLOW_LIGHT, PURPLE_LIGHT, BLUE_LIGHT]
