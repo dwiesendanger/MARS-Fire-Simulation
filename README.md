@@ -213,8 +213,10 @@ Experiment with different tree densities to observe percolation effects:
 
 ### Typical Simulation Output
 ```
+[FireLayer] Loaded density from config.json: 0.59
 HelperAgent initialized
-Fire simulation completed at tick 127. No more burning cells.
+Fire simulation completed at tick 507. No more burning cells.
+Burned area: 14326 of 36950 (38.77%)
 Fire simulation completed. Stopping simulation...
 Successfully executed iterations: 600
 ```

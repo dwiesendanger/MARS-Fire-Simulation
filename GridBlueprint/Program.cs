@@ -21,6 +21,25 @@ internal static class Program
     /// </summary>
     private static void Main()
     {
+        // Set up graceful shutdown handler for Ctrl+C
+        Console.CancelKeyPress += (sender, e) =>
+        {
+            e.Cancel = true; // Prevent immediate termination
+            Console.WriteLine("\nSimulation interrupted by user. Calculating final results...");
+            
+            // Output final burned area statistics if FireLayer is available
+            var fireLayer = FireLayer.Instance;
+            if (fireLayer != null)
+            {
+                // Call the OutputBurnedPercentage method via reflection
+                var method = typeof(FireLayer).GetMethod("OutputBurnedPercentage", 
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                method?.Invoke(fireLayer, null);
+            }
+            
+            Environment.Exit(0);
+        };
+
         // Create a new model description and register simulation components
         var description = new ModelDescription();
         description.AddLayer<FireLayer>();
