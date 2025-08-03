@@ -6,7 +6,7 @@ using Mars.Core.Data;
 using Mars.Interfaces.Data;
 using Mars.Interfaces.Layers;
 using GridBlueprint.Model.Agents;
-using Mars.Interfaces.Annotations;
+using GridBlueprint.Model.Utils;
 
 namespace GridBlueprint.Model.Layers;
 
@@ -21,11 +21,10 @@ public class FireLayer : RasterLayer
     #region Fields and Properties
 
     /// <summary>
-    ///     NOTE: This is a fallback value. The actual density is loaded from config.json and overrides this value.
-    ///     To change tree density, modify the "density" parameter in config.json, not this property.
+    ///     Tree density for forest generation. This value is loaded from config.json.
+    ///     To change tree density, modify the "density" parameter in config.json.
     /// </summary>
-    [PropertyDescription(Name = "density")]
-    public double Density { get; set; } = 0.65;
+    public double Density { get; set; } = 0.65; // Fallback value if config loading fails
 
     /// <summary>
     ///     Queue storing coordinates of cells that are currently burning.
@@ -45,15 +44,15 @@ public class FireLayer : RasterLayer
     private bool _simulationComplete = false;
 
     /// <summary>
-    ///     Cached array of 4-connected neighbor directions (North, South, East, West).
-    ///     Used for efficient neighbor iteration during fire spreading calculations.
-    /// </summary>
-    private readonly (int dx, int dy)[] _neighbors = { (-1, 0), (1, 0), (0, -1), (0, 1) };
-
-    /// <summary>
     ///     Gets whether the fire simulation has completed (no more cells are burning).
     /// </summary>
     public bool IsSimulationComplete => _simulationComplete;
+
+    /// <summary>
+    ///     Global instance of the FireLayer, accessible from anywhere.
+    ///     Set during initialization to provide a global access point to the FireLayer instance.
+    /// </summary>
+    public static FireLayer Instance { get; private set; }
 
     #endregion
 
@@ -71,22 +70,62 @@ public class FireLayer : RasterLayer
     public override bool InitLayer(LayerInitData layerInitData, RegisterAgent registerAgentHandle,
         UnregisterAgent unregisterAgentHandle)
     {
+        Instance = this;
+
         // Initialize the base RasterLayer with CSV data
         var initLayer = base.InitLayer(layerInitData, registerAgentHandle, unregisterAgentHandle);
+
+        // Load density from config.json
+        double configDensity = 0.65; // fallback value
         
-        // Use fallback density if configuration value is invalid
-        var density = Density > 0 ? Density : 0.65;
-        var rnd = new Random(42); // Fixed seed for reproducible results
+        try
+        {
+            // Read and parse config.json directly
+            var configPath = "config.json";
+            if (System.IO.File.Exists(configPath))
+            {
+                var configJson = System.IO.File.ReadAllText(configPath);
+                var config = Newtonsoft.Json.Linq.JObject.Parse(configJson);
+                
+                // Find the FireLayer configuration
+                var layers = config["layers"] as Newtonsoft.Json.Linq.JArray;
+                if (layers != null)
+                {
+                    foreach (var layer in layers)
+                    {
+                        if (layer["name"]?.ToString() == "FireLayer" && layer["density"] != null)
+                        {
+                            if (double.TryParse(layer["density"].ToString(), out double parsedDensity))
+                            {
+                                configDensity = parsedDensity;
+                                Console.WriteLine($"[FireLayer] Loaded density from config.json: {configDensity}");
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                Console.WriteLine($"[FireLayer] config.json not found, using fallback density: {configDensity}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[FireLayer] Error loading config.json: {ex.Message}, using fallback density: {configDensity}");
+        }
         
-        // Override CSV data with density-based forest generation
-        GenerateForest(density, rnd);
+        var rnd = new Random();
         
-        // Ignite the entire left column to start the NetLogo Fire simulation
+        // Generate forest with density-based tree distribution
+        GenerateForest(configDensity, rnd);
+        
+        // Ignite the entire left column to start the fire simulation
         IgniteLeftColumn();
         
-        // Spawn and register the HelperAgent that will drive the simulation
+        // Spawn the HelperAgent to drive the simulation
         var agentManager = layerInitData.Container.Resolve<IAgentManager>();
-        var helperAgents = agentManager.Spawn<HelperAgent, FireLayer>().ToList();
+        agentManager.Spawn<HelperAgent, FireLayer>().ToList();
 
         return initLayer;
     }
@@ -109,8 +148,7 @@ public class FireLayer : RasterLayer
             {
                 int x = i % Width;
                 int y = i / Width;
-                // Cell states: 0=Empty, 1=Tree, 2=Burning, 3=Burned
-                this[x, y] = (rnd.NextDouble() < density) ? 1.0 : 0.0;
+                this[x, y] = (rnd.NextDouble() < density) ? (double)CellState.Tree : (double)CellState.Empty;
             }
         }
     }
@@ -123,7 +161,7 @@ public class FireLayer : RasterLayer
     {
         for (int y = 0; y < Height; y++)
         {
-            this[0, y] = 2.0; // Set to burning state
+            this[0, y] = (double)CellState.Burning;
             var cell = (0, y);
             _burningCells.Enqueue(cell);
             _burningSet.Add(cell);
@@ -149,6 +187,7 @@ public class FireLayer : RasterLayer
             {
                 _simulationComplete = true;
                 Console.WriteLine($"Fire simulation completed at tick {GetCurrentTick()}. No more burning cells.");
+                OutputBurnedPercentage();
             }
             return;
         }
@@ -163,14 +202,10 @@ public class FireLayer : RasterLayer
             var (x, y) = _burningCells.Dequeue();
             _burningSet.Remove((x, y));
 
-            // Spread fire to all 4-connected neighbors
-            SpreadFireToNeighbors(x, y, newBurningCells);
-            
-            // Transition current burning cell to burned state
-            this[x, y] = 3.0; // Burned
+            SpreadFire(x, y, newBurningCells);
+            this[x, y] = (double)CellState.Burned;
         }
 
-        // Add all newly ignited cells to the burning queue
         foreach (var cell in newBurningCells)
         {
             _burningCells.Enqueue(cell);
@@ -185,7 +220,7 @@ public class FireLayer : RasterLayer
     /// <param name="x">X-coordinate of the burning cell</param>
     /// <param name="y">Y-coordinate of the burning cell</param>
     /// <param name="newBurningCells">Collection to store newly ignited cells</param>
-    private void SpreadFireToNeighbors(int x, int y, List<(int x, int y)> newBurningCells)
+    private void SpreadFire(int x, int y, List<(int x, int y)> newBurningCells)
     {
         // Check all 4-connected neighbors (North, South, East, West)
         CheckAndIgniteNeighbor(x - 1, y, newBurningCells); // West
@@ -203,15 +238,35 @@ public class FireLayer : RasterLayer
     /// <param name="newBurningCells">Collection to add the newly ignited cell to</param>
     private void CheckAndIgniteNeighbor(int x, int y, List<(int x, int y)> newBurningCells)
     {
-        // Check if coordinates are within grid bounds
         if (x < 0 || x >= Width || y < 0 || y >= Height) return;
-        
-        // Check if cell contains a tree and is not already burning
-        if (this[x, y] == 1.0 && !_burningSet.Contains((x, y)))
+        if ((CellState)this[x, y] == CellState.Tree && !_burningSet.Contains((x, y)))
         {
-            this[x, y] = 2.0; // Set to burning state
+            this[x, y] = (double)CellState.Burning;
             newBurningCells.Add((x, y));
         }
+    }
+
+    /// <summary>
+    ///     Calculates and outputs the percentage of burned area when the simulation is complete.
+    ///     This method is called automatically at the end of the simulation.
+    /// </summary>
+    private void OutputBurnedPercentage()
+    {
+        int burned = 0;
+        int total = 0;
+        for (int x = 0; x < Width; x++)
+        {
+            for (int y = 0; y < Height; y++)
+            {
+                var state = (CellState)this[x, y];
+                if (state == CellState.Tree || state == CellState.Burning || state == CellState.Burned)
+                    total++;
+                if (state == CellState.Burned)
+                    burned++;
+            }
+        }
+        double percent = total > 0 ? (100.0 * burned / total) : 0.0;
+        Console.WriteLine($"Burned area: {burned} of {total} ({percent:F2}%)");
     }
 
     #endregion
