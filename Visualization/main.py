@@ -25,18 +25,25 @@ YELLOW_LIGHT = [205, 217, 104, 10]
 PURPLE_LIGHT = [162, 134, 222, 10]
 BLUE_LIGHT = [174, 218, 233, 10]
 
-# NetLogo Fire colors:
-# 0: black (Empty), 1: green (Tree), 2: light-red (Burning), 3: dark-red (Burned)
+# NetLogo Fire colors with Ember stages:
+# 0: black (Empty), 1: green (Tree), 2: bright-red (Burning), 
+# 3: orange-red (Ember3), 4: orange (Ember2), 5: dark-orange (Ember1), 6: dark-red (Burned)
 FIRE_GREEN = (0, 180, 0)
-FIRE_BURNING = (255, 100, 50)
-FIRE_BURNED = (80, 0, 0)
+FIRE_BURNING = (255, 50, 50)      # Bright red for active burning
+FIRE_EMBER3 = (255, 69, 0)        # Hot ember - bright orange-red
+FIRE_EMBER2 = (255, 102, 0)       # Medium ember - orange
+FIRE_EMBER1 = (204, 51, 0)        # Cool ember - dark orange-red
+FIRE_BURNED = (80, 0, 0)          # Fully burned - dark red
 FIRE_EMPTY = (0, 0, 0)
 
 RASTER_COLORS = {
     0: FIRE_EMPTY,    # Empty
     1: FIRE_GREEN,    # Tree
     2: FIRE_BURNING,  # Burning
-    3: FIRE_BURNED,   # Burned
+    3: FIRE_EMBER3,   # Hot Ember
+    4: FIRE_EMBER2,   # Medium Ember  
+    5: FIRE_EMBER1,   # Cool Ember
+    6: FIRE_BURNED,   # Burned
 }
 UNKNOWN_RASTER = WHITE
 AGENT_COLORS = [GREEN_LIGHT, YELLOW_LIGHT, PURPLE_LIGHT, BLUE_LIGHT]

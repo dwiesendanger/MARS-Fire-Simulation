@@ -39,12 +39,24 @@ public class FireLayer : RasterLayer
     private readonly HashSet<(int x, int y)> _burningSet = new();
 
     /// <summary>
+    ///     Queue storing coordinates of cells that are currently in ember stages.
+    ///     These cells cool down gradually through Ember3 -> Ember2 -> Ember1 -> Burned.
+    /// </summary>
+    private readonly Queue<(int x, int y)> _emberCells = new();
+
+    /// <summary>
+    ///     HashSet for O(1) lookup to check if a cell is already in ember stage.
+    ///     Prevents duplicate entries in the ember cells queue and improves performance.
+    /// </summary>
+    private readonly HashSet<(int x, int y)> _emberSet = new();
+
+    /// <summary>
     ///     Flag indicating whether the fire simulation has completed (no more burning cells).
     /// </summary>
     private bool _simulationComplete = false;
 
     /// <summary>
-    ///     Gets whether the fire simulation has completed (no more cells are burning).
+    ///     Gets whether the fire simulation has completed (no more cells are burning or cooling).
     /// </summary>
     public bool IsSimulationComplete => _simulationComplete;
 
@@ -180,13 +192,13 @@ public class FireLayer : RasterLayer
     /// </summary>
     public void Tick()
     {
-        // Early exit if simulation is complete or no cells are burning
-        if (_simulationComplete || _burningCells.Count == 0)
+        // Early exit if simulation is complete or no cells are burning or cooling
+        if (_simulationComplete || (_burningCells.Count == 0 && _emberCells.Count == 0))
         {
             if (!_simulationComplete)
             {
                 _simulationComplete = true;
-                Console.WriteLine($"Fire simulation completed at tick {GetCurrentTick()}. No more burning cells.");
+                Console.WriteLine($"Fire simulation completed at tick {GetCurrentTick()}. No more burning or ember cells.");
                 OutputBurnedPercentage();
             }
             return;
@@ -203,13 +215,49 @@ public class FireLayer : RasterLayer
             _burningSet.Remove((x, y));
 
             SpreadFire(x, y, newBurningCells);
-            this[x, y] = (double)CellState.Burned;
+            // Change: Transition to Ember3 instead of directly to Burned
+            this[x, y] = (double)CellState.Ember3;
+            _emberCells.Enqueue((x, y));
+            _emberSet.Add((x, y));
         }
 
         foreach (var cell in newBurningCells)
         {
             _burningCells.Enqueue(cell);
             _burningSet.Add(cell);
+        }
+
+        // Process ember cells
+        var currentEmberCount = _emberCells.Count;
+        var newEmberCells = new List<(int x, int y)>(currentEmberCount);
+
+        for (int i = 0; i < currentEmberCount; i++)
+        {
+            var (x, y) = _emberCells.Dequeue();
+            _emberSet.Remove((x, y));
+
+            // Transition ember stages
+            var currentState = (CellState)this[x, y];
+            if (currentState == CellState.Ember3)
+            {
+                this[x, y] = (double)CellState.Ember2;
+                newEmberCells.Add((x, y));
+            }
+            else if (currentState == CellState.Ember2)
+            {
+                this[x, y] = (double)CellState.Ember1;
+                newEmberCells.Add((x, y));
+            }
+            else if (currentState == CellState.Ember1)
+            {
+                this[x, y] = (double)CellState.Burned;
+            }
+        }
+
+        foreach (var cell in newEmberCells)
+        {
+            _emberCells.Enqueue(cell);
+            _emberSet.Add(cell);
         }
     }
 
@@ -231,7 +279,7 @@ public class FireLayer : RasterLayer
 
     /// <summary>
     ///     Checks if a neighbor cell can be ignited and adds it to the burning queue if possible.
-    ///     A cell can be ignited if it's within bounds, contains a tree, and is not already burning.
+    ///     A cell can be ignited if it's within bounds, contains a tree, and is not already burning or ember.
     /// </summary>
     /// <param name="x">X-coordinate of the neighbor cell to check</param>
     /// <param name="y">Y-coordinate of the neighbor cell to check</param>
@@ -239,7 +287,7 @@ public class FireLayer : RasterLayer
     private void CheckAndIgniteNeighbor(int x, int y, List<(int x, int y)> newBurningCells)
     {
         if (x < 0 || x >= Width || y < 0 || y >= Height) return;
-        if ((CellState)this[x, y] == CellState.Tree && !_burningSet.Contains((x, y)))
+        if ((CellState)this[x, y] == CellState.Tree && !_burningSet.Contains((x, y)) && !_emberSet.Contains((x, y)))
         {
             this[x, y] = (double)CellState.Burning;
             newBurningCells.Add((x, y));
@@ -249,6 +297,7 @@ public class FireLayer : RasterLayer
     /// <summary>
     ///     Calculates and outputs the percentage of burned area when the simulation is complete.
     ///     This method is called automatically at the end of the simulation.
+    ///     Includes all ember stages and fully burned cells in the burned count.
     /// </summary>
     private void OutputBurnedPercentage()
     {
@@ -259,9 +308,15 @@ public class FireLayer : RasterLayer
             for (int y = 0; y < Height; y++)
             {
                 var state = (CellState)this[x, y];
-                if (state == CellState.Tree || state == CellState.Burning || state == CellState.Burned)
+                // Count all vegetation (trees, burning, embers, burned)
+                if (state == CellState.Tree || state == CellState.Burning || 
+                    state == CellState.Ember3 || state == CellState.Ember2 || 
+                    state == CellState.Ember1 || state == CellState.Burned)
                     total++;
-                if (state == CellState.Burned)
+                // Count all states that have been affected by fire (burning, embers, burned)
+                if (state == CellState.Burning || state == CellState.Ember3 || 
+                    state == CellState.Ember2 || state == CellState.Ember1 || 
+                    state == CellState.Burned)
                     burned++;
             }
         }
