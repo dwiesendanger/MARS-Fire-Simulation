@@ -14,7 +14,9 @@
       "density": 0.59,
       "file": "Resources/grid_250x250.csv",
       "worldWrapsHorizontally": false,
-      "worldWrapsVertically": false
+      "worldWrapsVertically": false,
+      "allowDiagonalSpread": false,
+      "fireSpreadProbability": 1.0
     }
   ],
   "agents": [

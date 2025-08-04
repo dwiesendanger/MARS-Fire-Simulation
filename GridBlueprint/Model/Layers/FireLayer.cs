@@ -39,6 +39,19 @@ public class FireLayer : RasterLayer
     public bool WorldWrapsVertically { get; set; } = false;
 
     /// <summary>
+    ///     Whether fire can spread diagonally (8-connected neighborhood).
+    ///     When false, uses 4-connected neighborhood (North, South, East, West only).
+    ///     When true, includes diagonal directions (NE, NW, SE, SW).
+    /// </summary>
+    public bool AllowDiagonalSpread { get; set; } = false;
+
+    /// <summary>
+    ///     Probability that fire spreads to an adjacent tree (0.0 = never, 1.0 = always).
+    ///     Allows modeling of varying fire spread conditions and natural firebreaks.
+    /// </summary>
+    public double FireSpreadProbability { get; set; } = 1.0;
+
+    /// <summary>
     ///     Queue storing coordinates of cells that are currently burning.
     ///     Uses FIFO processing to ensure fire spreads in the correct temporal order.
     /// </summary>
@@ -78,6 +91,12 @@ public class FireLayer : RasterLayer
     /// </summary>
     public static FireLayer Instance { get; private set; }
 
+    /// <summary>
+    ///     Random number generator for fire spread probability calculations.
+    ///     Reused across all probability checks for better performance.
+    /// </summary>
+    private readonly Random _random = new();
+
     #endregion
 
     #region Initialization
@@ -103,6 +122,8 @@ public class FireLayer : RasterLayer
         double configDensity = 0.65; // fallback value
         bool configWorldWrapsHorizontally = false; // fallback value
         bool configWorldWrapsVertically = false; // fallback value
+        bool configAllowDiagonalSpread = false; // fallback value
+        double configFireSpreadProbability = 1.0; // fallback value
         
         try
         {
@@ -138,7 +159,19 @@ public class FireLayer : RasterLayer
                                 configWorldWrapsVertically = parsedVertical;
                             }
                             
-                            Console.WriteLine($"[FireLayer] Loaded config - Density: {configDensity}, WorldWrapsHorizontally: {configWorldWrapsHorizontally}, WorldWrapsVertically: {configWorldWrapsVertically}");
+                            // Load diagonal spread option
+                            if (layer["allowDiagonalSpread"] != null && bool.TryParse(layer["allowDiagonalSpread"].ToString(), out bool parsedDiagonal))
+                            {
+                                configAllowDiagonalSpread = parsedDiagonal;
+                            }
+                            
+                            // Load fire spread probability
+                            if (layer["fireSpreadProbability"] != null && double.TryParse(layer["fireSpreadProbability"].ToString(), out double parsedProbability))
+                            {
+                                configFireSpreadProbability = Math.Clamp(parsedProbability, 0.0, 1.0); // Ensure valid range
+                            }
+                            
+                            Console.WriteLine($"[FireLayer] Loaded config - Density: {configDensity}, WorldWraps: H:{configWorldWrapsHorizontally}/V:{configWorldWrapsVertically}, DiagonalSpread: {configAllowDiagonalSpread}, SpreadProbability: {configFireSpreadProbability}");
                             break;
                         }
                     }
@@ -158,6 +191,8 @@ public class FireLayer : RasterLayer
         Density = configDensity;
         WorldWrapsHorizontally = configWorldWrapsHorizontally;
         WorldWrapsVertically = configWorldWrapsVertically;
+        AllowDiagonalSpread = configAllowDiagonalSpread;
+        FireSpreadProbability = configFireSpreadProbability;
         
         var rnd = new Random();
         
@@ -307,6 +342,15 @@ public class FireLayer : RasterLayer
         CheckAndIgniteNeighbor(x + 1, y, newBurningCells); // East
         CheckAndIgniteNeighbor(x, y - 1, newBurningCells); // South
         CheckAndIgniteNeighbor(x, y + 1, newBurningCells); // North
+
+        // Check diagonal neighbors if allowed
+        if (AllowDiagonalSpread)
+        {
+            CheckAndIgniteNeighbor(x - 1, y - 1, newBurningCells); // SW
+            CheckAndIgniteNeighbor(x + 1, y - 1, newBurningCells); // SE
+            CheckAndIgniteNeighbor(x - 1, y + 1, newBurningCells); // NW
+            CheckAndIgniteNeighbor(x + 1, y + 1, newBurningCells); // NE
+        }
     }
 
     /// <summary>
@@ -357,8 +401,12 @@ public class FireLayer : RasterLayer
             !_burningSet.Contains(cellPosition) && 
             !_emberSet.Contains(cellPosition))
         {
-            this[wrappedX, wrappedY] = (double)CellState.Burning;
-            newBurningCells.Add(cellPosition);
+            // Check fire spread probability
+            if (_random.NextDouble() <= FireSpreadProbability)
+            {
+                this[wrappedX, wrappedY] = (double)CellState.Burning;
+                newBurningCells.Add(cellPosition);
+            }
         }
     }
 

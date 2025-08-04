@@ -28,10 +28,11 @@ This project recreates the NetLogo Fire model, which demonstrates how fires spre
 
 ### Fire Spread Rules
 - Fire starts along the entire left column (x=0) of the grid
-- Fire spreads to adjacent trees using 4-connected neighborhood (North, South, East, West)
-- No diagonal spreading (consistent with NetLogo Fire model)
+- Fire spreads to adjacent trees using 4-connected neighborhood (North, South, East, West) by default
+- Optional diagonal spreading: When enabled, fire can spread in 8 directions (including NE, NW, SE, SW)
 - Burning cells transition to ember stages: Burning → Ember3 → Ember2 → Ember1 → Burned
 - Each ember stage lasts one tick, creating a realistic cooling effect
+- Fire spread probability: Configurable chance (0.0-1.0) that fire spreads to adjacent trees
 - Simulation ends when no cells are actively burning or cooling
 
 ### World Wrapping (NetLogo Feature)
@@ -47,8 +48,8 @@ Configure wrapping in `config.json`:
   "layers": [
     {
       "name": "FireLayer",
-      "worldWrapsHorizontally": false,  // Enable horizontal wrapping
-      "worldWrapsVertically": false     // Enable vertical wrapping
+      "worldWrapsHorizontally": false,
+      "worldWrapsVertically": false
     }
   ]
 }
@@ -129,7 +130,9 @@ Here is a sample configuration file:
       "density": 0.59,
       "file": "Resources/grid_250x250.csv",
       "worldWrapsHorizontally": false,
-      "worldWrapsVertically": false
+      "worldWrapsVertically": false,
+      "allowDiagonalSpread": false,
+      "fireSpreadProbability": 1.0
     }
   ],
   "agents": [
@@ -146,6 +149,8 @@ Here is a sample configuration file:
 - **`density`**: Tree density (0.0 = no trees, 1.0 = all trees). Typical values: 0.3-0.9
 - **`worldWrapsHorizontally`**: Enable horizontal world wrapping (default: false)
 - **`worldWrapsVertically`**: Enable vertical world wrapping (default: false)
+- **`allowDiagonalSpread`**: Enable 8-directional fire spread including diagonals (default: false)
+- **`fireSpreadProbability`**: Probability that fire spreads to adjacent trees (0.0-1.0, default: 1.0)
 - **`file`**: Grid size to use. Available options:
     - `Resources/grid_2x2.csv` (2×2 - minimal testing)
     - `Resources/grid.csv` (10×10 - small tests)
@@ -219,7 +224,7 @@ Experiment with different tree densities to observe percolation effects:
 
 ### Grid Size Comparisons
 - **Small Grids (10×10)**: Quick testing and verification
-- **Medium Grids (50×50)**: Detailed observation of spread patterns
+- **Medium Grids (50×50)**: Detailed observation of spread patterns  
 - **Large Grids (250×250)**: Statistical analysis and percolation studies
 
 ## Technical Implementation
