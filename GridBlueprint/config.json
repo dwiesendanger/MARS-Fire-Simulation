@@ -12,7 +12,9 @@
       "name": "FireLayer",
       "pythonVisualization": true,
       "density": 0.59,
-      "file": "Resources/grid_250x250.csv"
+      "file": "Resources/grid_250x250.csv",
+      "worldWrapsHorizontally": false,
+      "worldWrapsVertically": false
     }
   ],
   "agents": [

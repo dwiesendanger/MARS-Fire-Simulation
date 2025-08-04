@@ -27,6 +27,18 @@ public class FireLayer : RasterLayer
     public double Density { get; set; } = 0.65; // Fallback value if config loading fails
 
     /// <summary>
+    ///     Whether the world wraps horizontally (left edge connects to right edge).
+    ///     This enables fire to spread from the rightmost column to the leftmost column.
+    /// </summary>
+    public bool WorldWrapsHorizontally { get; set; } = false;
+
+    /// <summary>
+    ///     Whether the world wraps vertically (top edge connects to bottom edge).
+    ///     This enables fire to spread from the topmost row to the bottommost row.
+    /// </summary>
+    public bool WorldWrapsVertically { get; set; } = false;
+
+    /// <summary>
     ///     Queue storing coordinates of cells that are currently burning.
     ///     Uses FIFO processing to ensure fire spreads in the correct temporal order.
     /// </summary>
@@ -87,8 +99,10 @@ public class FireLayer : RasterLayer
         // Initialize the base RasterLayer with CSV data
         var initLayer = base.InitLayer(layerInitData, registerAgentHandle, unregisterAgentHandle);
 
-        // Load density from config.json
+        // Load configuration from config.json
         double configDensity = 0.65; // fallback value
+        bool configWorldWrapsHorizontally = false; // fallback value
+        bool configWorldWrapsVertically = false; // fallback value
         
         try
         {
@@ -105,27 +119,45 @@ public class FireLayer : RasterLayer
                 {
                     foreach (var layer in layers)
                     {
-                        if (layer["name"]?.ToString() == "FireLayer" && layer["density"] != null)
+                        if (layer["name"]?.ToString() == "FireLayer")
                         {
-                            if (double.TryParse(layer["density"].ToString(), out double parsedDensity))
+                            // Load density
+                            if (layer["density"] != null && double.TryParse(layer["density"].ToString(), out double parsedDensity))
                             {
                                 configDensity = parsedDensity;
-                                Console.WriteLine($"[FireLayer] Loaded density from config.json: {configDensity}");
-                                break;
                             }
+                            
+                            // Load world wrapping options
+                            if (layer["worldWrapsHorizontally"] != null && bool.TryParse(layer["worldWrapsHorizontally"].ToString(), out bool parsedHorizontal))
+                            {
+                                configWorldWrapsHorizontally = parsedHorizontal;
+                            }
+                            
+                            if (layer["worldWrapsVertically"] != null && bool.TryParse(layer["worldWrapsVertically"].ToString(), out bool parsedVertical))
+                            {
+                                configWorldWrapsVertically = parsedVertical;
+                            }
+                            
+                            Console.WriteLine($"[FireLayer] Loaded config - Density: {configDensity}, WorldWrapsHorizontally: {configWorldWrapsHorizontally}, WorldWrapsVertically: {configWorldWrapsVertically}");
+                            break;
                         }
                     }
                 }
             }
             else
             {
-                Console.WriteLine($"[FireLayer] config.json not found, using fallback density: {configDensity}");
+                Console.WriteLine($"[FireLayer] config.json not found, using fallback values");
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[FireLayer] Error loading config.json: {ex.Message}, using fallback density: {configDensity}");
+            Console.WriteLine($"[FireLayer] Error loading config.json: {ex.Message}, using fallback values");
         }
+        
+        // Apply loaded configuration
+        Density = configDensity;
+        WorldWrapsHorizontally = configWorldWrapsHorizontally;
+        WorldWrapsVertically = configWorldWrapsVertically;
         
         var rnd = new Random();
         
@@ -279,18 +311,54 @@ public class FireLayer : RasterLayer
 
     /// <summary>
     ///     Checks if a neighbor cell can be ignited and adds it to the burning queue if possible.
-    ///     A cell can be ignited if it's within bounds, contains a tree, and is not already burning or ember.
+    ///     Supports world wrapping for seamless fire spread across grid boundaries.
+    ///     A cell can be ignited if it contains a tree and is not already burning or ember.
     /// </summary>
     /// <param name="x">X-coordinate of the neighbor cell to check</param>
     /// <param name="y">Y-coordinate of the neighbor cell to check</param>
     /// <param name="newBurningCells">Collection to add the newly ignited cell to</param>
     private void CheckAndIgniteNeighbor(int x, int y, List<(int x, int y)> newBurningCells)
     {
-        if (x < 0 || x >= Width || y < 0 || y >= Height) return;
-        if ((CellState)this[x, y] == CellState.Tree && !_burningSet.Contains((x, y)) && !_emberSet.Contains((x, y)))
+        // Apply world wrapping if enabled
+        int wrappedX = x;
+        int wrappedY = y;
+        
+        // Handle horizontal wrapping
+        if (WorldWrapsHorizontally)
         {
-            this[x, y] = (double)CellState.Burning;
-            newBurningCells.Add((x, y));
+            if (x < 0)
+                wrappedX = Width - 1;  // Wrap from left edge to right edge
+            else if (x >= Width)
+                wrappedX = 0;          // Wrap from right edge to left edge
+        }
+        else
+        {
+            // No horizontal wrapping - check bounds
+            if (x < 0 || x >= Width) return;
+        }
+        
+        // Handle vertical wrapping
+        if (WorldWrapsVertically)
+        {
+            if (y < 0)
+                wrappedY = Height - 1; // Wrap from bottom edge to top edge
+            else if (y >= Height)
+                wrappedY = 0;          // Wrap from top edge to bottom edge
+        }
+        else
+        {
+            // No vertical wrapping - check bounds
+            if (y < 0 || y >= Height) return;
+        }
+        
+        // Check if the wrapped cell can be ignited
+        var cellPosition = (wrappedX, wrappedY);
+        if ((CellState)this[wrappedX, wrappedY] == CellState.Tree && 
+            !_burningSet.Contains(cellPosition) && 
+            !_emberSet.Contains(cellPosition))
+        {
+            this[wrappedX, wrappedY] = (double)CellState.Burning;
+            newBurningCells.Add(cellPosition);
         }
     }
 

@@ -21,14 +21,38 @@ This project recreates the NetLogo Fire model, which demonstrates how fires spre
 - **Empty (0)**: Black cells with no vegetation - fire cannot spread through these
 - **Tree (1)**: Green cells containing trees - can be ignited by adjacent burning cells
 - **Burning (2)**: Bright red cells currently on fire - spread fire to neighboring trees
-- **Burned (3)**: Dark red cells that have finished burning - final state
+- **Ember3 (3)**: Hot embers - bright orange-red cells in first cooling stage
+- **Ember2 (4)**: Medium embers - orange cells in second cooling stage  
+- **Ember1 (5)**: Cool embers - dark orange-red cells in final cooling stage
+- **Burned (6)**: Dark red cells that have finished burning - final state
 
 ### Fire Spread Rules
 - Fire starts along the entire left column (x=0) of the grid
 - Fire spreads to adjacent trees using 4-connected neighborhood (North, South, East, West)
 - No diagonal spreading (consistent with NetLogo Fire model)
-- Burning cells transition to burned state after one time step
-- Simulation ends when no cells are actively burning
+- Burning cells transition to ember stages: Burning → Ember3 → Ember2 → Ember1 → Burned
+- Each ember stage lasts one tick, creating a realistic cooling effect
+- Simulation ends when no cells are actively burning or cooling
+
+### World Wrapping (NetLogo Feature)
+The simulation supports NetLogo's world wrapping functionality:
+
+- **Horizontal Wrapping**: When enabled, fire can spread from the rightmost column to the leftmost column (and vice versa), creating a cylindrical world topology
+- **Vertical Wrapping**: When enabled, fire can spread from the topmost row to the bottommost row (and vice versa)
+- **Combined Wrapping**: Both options can be enabled simultaneously to create a torus-shaped world where fire can theoretically spread indefinitely
+
+Configure wrapping in `config.json`:
+```json
+{
+  "layers": [
+    {
+      "name": "FireLayer",
+      "worldWrapsHorizontally": false,  // Enable horizontal wrapping
+      "worldWrapsVertically": false     // Enable vertical wrapping
+    }
+  ]
+}
+```
 
 ## Getting Started
 
@@ -102,8 +126,10 @@ Here is a sample configuration file:
     {
       "name": "FireLayer",
       "pythonVisualization": true,
-      "density": 0.65,
-      "file": "Resources/grid_250x250.csv"
+      "density": 0.59,
+      "file": "Resources/grid_250x250.csv",
+      "worldWrapsHorizontally": false,
+      "worldWrapsVertically": false
     }
   ],
   "agents": [
@@ -118,6 +144,8 @@ Here is a sample configuration file:
 ### Key Parameters
 
 - **`density`**: Tree density (0.0 = no trees, 1.0 = all trees). Typical values: 0.3-0.9
+- **`worldWrapsHorizontally`**: Enable horizontal world wrapping (default: false)
+- **`worldWrapsVertically`**: Enable vertical world wrapping (default: false)
 - **`file`**: Grid size to use. Available options:
     - `Resources/grid_2x2.csv` (2×2 - minimal testing)
     - `Resources/grid.csv` (10×10 - small tests)
@@ -213,7 +241,7 @@ Experiment with different tree densities to observe percolation effects:
 
 ### Typical Simulation Output
 ```
-[FireLayer] Loaded density from config.json: 0.59
+[FireLayer] Loaded config - Density: 0.59, WorldWrapsHorizontally: False, WorldWrapsVertically: False
 HelperAgent initialized
 Fire simulation completed at tick 507. No more burning cells.
 Burned area: 14326 of 36950 (38.77%)
